@@ -23,6 +23,7 @@ module.exports = function (options) {
     options
   )
 
+
   var tu = seneca.export('transport/utils')
 
   seneca.add({role: 'transport', hook: 'listen', type: 'redis-sync'}, hook_listen_redis)
@@ -109,6 +110,11 @@ module.exports = function (options) {
 
     tu.make_client(make_send, client_options, clientdone)
 
+    console.warn('[seneca-redis-sync-transport]', 'WARNING: Ignoring invalid origin messages for seneca-redis-sync-tranport. ' +
+      'This is to prevent seneca-transport from noisily logging on receipt of responses for other origins. This can only be ' +
+      'properly solved in this transport by changing the implementation to route responses only to the origin. The current ' +
+      'implementation introduces network and processing overhead.')
+
     function make_send (spec, topic, send_done) {
       var redis_in = redis.createClient(client_options.port, client_options.host)
       var redis_out = redis.createClient(client_options.port, client_options.host)
@@ -118,7 +124,9 @@ module.exports = function (options) {
 
       redis_in.on('message', function (channel, msgstr) {
         var input = tu.parseJSON(seneca, 'client-' + type, msgstr)
-        tu.handle_response(seneca, input, client_options)
+        if(seneca.id === input.origin)  {
+          tu.handle_response(seneca, input, client_options)
+        }
       })
 
       seneca.log.debug('client', 'subscribe', topic + '_res', client_options, seneca)
